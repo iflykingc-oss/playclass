@@ -1035,3 +1035,13 @@ export function getParallelSceneConcurrency(): number {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
   return Math.min(raw, 10);
 }
+
+
+/**
+ * Clear the in-memory provider config cache so the next call reloads from YAML.
+ * Called by the super-admin settings API after saving server-providers.yml.
+ */
+export function reloadServerProviders(): void {
+  _configs.clear();
+  log.info('Provider config cache cleared — will reload from YAML on next use');
+}

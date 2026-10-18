@@ -663,6 +663,53 @@ function SceneRow({
             )}
           />
 
+          {/* WP2.5: teacher difficulty + curriculum tags (beat LLM-only guess) */}
+          {!disabled && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-muted-foreground">
+              <label className="inline-flex items-center gap-1">
+                <span>{t('generation.difficulty') || '难度'}</span>
+                <select
+                  value={outline.teacherDifficulty || outline.quizConfig?.difficulty || ''}
+                  onChange={(event) => {
+                    const value = event.target.value as 'easy' | 'medium' | 'hard' | '';
+                    onUpdate({
+                      teacherDifficulty: value || undefined,
+                      quizConfig: value
+                        ? {
+                            questionCount: outline.quizConfig?.questionCount ?? 3,
+                            difficulty: value,
+                            questionTypes: outline.quizConfig?.questionTypes ?? ['single'],
+                          }
+                        : outline.quizConfig,
+                    });
+                  }}
+                  className="rounded-md border border-border/60 bg-transparent px-1.5 py-0.5"
+                >
+                  <option value="">{t('generation.difficultyAuto') || '自动'}</option>
+                  <option value="easy">{t('generation.difficultyEasy') || '简单'}</option>
+                  <option value="medium">{t('generation.difficultyMedium') || '中等'}</option>
+                  <option value="hard">{t('generation.difficultyHard') || '困难'}</option>
+                </select>
+              </label>
+              <label className="inline-flex min-w-[12rem] flex-1 items-center gap-1">
+                <span>{t('generation.curriculumTags') || '课标标签'}</span>
+                <input
+                  value={(outline.curriculumTags ?? []).join(', ')}
+                  onChange={(event) => {
+                    const tags = event.target.value
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .slice(0, 8);
+                    onUpdate({ curriculumTags: tags.length ? tags : undefined });
+                  }}
+                  placeholder={t('generation.curriculumTagsPlaceholder') || '例如：人教版·分数意义'}
+                  className="w-full rounded-md border border-border/60 bg-transparent px-1.5 py-0.5"
+                />
+              </label>
+            </div>
+          )}
+
           {/* Key points */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <AnimatePresence initial={false}>

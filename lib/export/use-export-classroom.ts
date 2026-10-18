@@ -37,6 +37,7 @@ import { createProxiedFetch } from './proxied-fetch';
 import type { SceneContent, Scene, Stage } from '@/lib/types/stage';
 import { preparePBLScenesForDocumentPersistence } from '@/lib/pbl/v2/runtime/document-persistence';
 import { accessDocument, type DocumentMigrationDeps } from '@/lib/document-store';
+import { buildOfflinePlayerHtml, OFFLINE_PLAYER_README } from './offline-player-template';
 
 export async function inlineSceneContent(
   content: SceneContent,
@@ -230,6 +231,10 @@ export async function buildClassroomExportZip(
     };
 
     zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+    // 9b. Offline folder player (WP1.6 / #1470): double-click index.html.
+    zip.file('index.html', buildOfflinePlayerHtml(latestName));
+    zip.file('README.txt', OFFLINE_PLAYER_README);
 
     // 10. Add media blobs to ZIP
     for (const af of audioFiles) {

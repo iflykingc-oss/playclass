@@ -75,13 +75,44 @@ export function configuredS3Bucket(value: string | undefined): string | undefine
  * package that declares the peer rather than from this app — and only when a
  * bucket is actually configured.
  */
+/**
+ * S3 client options for the optional AWS SDK.
+ *
+ * Supports AWS's own standard variables plus explicit ASSET_S3_* overrides so
+ * self-hosted object stores work:
+ *   ASSET_S3_ENDPOINT / AWS_ENDPOINT_URL  — MinIO, SeaweedFS, Ceph RGW, R2, …
+ *   ASSET_S3_FORCE_PATH_STYLE=true        — force path-style (default ON when a
+ *                                           custom endpoint is set, as virtual-host
+ *                                           style needs public DNS for the bucket)
+ *   ASSET_S3_REGION / AWS_REGION          — signing region (MinIO accepts any)
+ */
+export function s3ClientOptionsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): Record<string, unknown> {
+  const endpoint =
+    env.ASSET_S3_ENDPOINT?.trim() ||
+    env.AWS_ENDPOINT_URL?.trim() ||
+    env.AWS_S3_ENDPOINT?.trim() ||
+    undefined;
+  const region = env.ASSET_S3_REGION?.trim() || env.AWS_REGION?.trim() || env.AWS_DEFAULT_REGION?.trim() || 'us-east-1';
+  const forcePathStyleFlag =
+    env.ASSET_S3_FORCE_PATH_STYLE?.trim() || env.AWS_S3_FORCE_PATH_STYLE?.trim() || '';
+  const forcePathStyle =
+    forcePathStyleFlag === 'true' || forcePathStyleFlag === '1' || Boolean(endpoint);
+  return {
+    region,
+    ...(endpoint ? { endpoint } : {}),
+    ...(forcePathStyle ? { forcePathStyle: true } : {}),
+  };
+}
+
 export async function createAssetByteStore(
   bucket: string | undefined,
   queryable: Queryable,
 ): Promise<AssetByteStore> {
   if (!bucket) return new PgAssetByteStore(queryable);
   const storage = await import('@openmaic/storage/asset/s3-bytes');
-  return storage.loadS3AssetByteStore(bucket);
+  return storage.loadS3AssetByteStore(bucket, s3ClientOptionsFromEnv());
 }
 
 /**

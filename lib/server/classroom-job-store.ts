@@ -32,6 +32,10 @@ export interface ClassroomGenerationJob {
   };
   scenesGenerated: number;
   totalScenes?: number;
+  /** WP1.3: outline snapshot for resume after a crash. */
+  checkpointOutlines?: unknown;
+  /** WP1.3: scenes that failed after retries. */
+  failedScenes?: Array<{ index: number; title: string; error: string }>;
   result?: {
     classroomId: string;
     url: string;
@@ -204,6 +208,7 @@ export async function markClassroomGenerationJobSucceeded(
     message: result.warning ?? 'Classroom generation completed',
     completedAt: new Date().toISOString(),
     scenesGenerated: result.scenesCount,
+    ...(result.failedScenes ? { failedScenes: result.failedScenes } : {}),
     result: {
       classroomId: result.id,
       url: result.url,

@@ -85,6 +85,14 @@ export interface SceneOutline {
     questionTypes: ('single' | 'multiple' | 'text')[];
   };
   /**
+   * WP2.5: teacher-set difficulty for the whole scene (overrides LLM guess).
+   * Research (Easy Trap): LLMs underestimate misconception-driven items —
+   * teacher annotation + attempt data beat model-only difficulty.
+   */
+  teacherDifficulty?: 'easy' | 'medium' | 'hard';
+  /** Optional curriculum / standard tags the teacher wants respected. */
+  curriculumTags?: string[];
+  /**
    * @deprecated Use widgetType + widgetOutline instead
    * Legacy interactive config - kept for backward compatibility only
    */

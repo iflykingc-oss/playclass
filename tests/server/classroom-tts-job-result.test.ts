@@ -57,7 +57,7 @@ describe('classroom generation job TTS coverage', () => {
     await markClassroomGenerationJobSucceeded(
       'jobtts1',
       classroomResult({
-        ttsCoverage: { written: 1, total: 3 },
+        ttsCoverage: { written: 1, total: 3, failed: 2 },
         warning: INCOMPLETE_WARNING,
       }),
     );
@@ -69,7 +69,7 @@ describe('classroom generation job TTS coverage', () => {
       classroomId: 'cls1',
       url: 'http://localhost/classroom/cls1',
       scenesCount: 2,
-      ttsCoverage: { written: 1, total: 3 },
+      ttsCoverage: { written: 1, total: 3, failed: 2 },
       warning: INCOMPLETE_WARNING,
     });
   });
@@ -84,7 +84,7 @@ describe('classroom generation job TTS coverage', () => {
     await createClassroomGenerationJob('jobtts4', { requirement: 'Teach pacing' });
     await markClassroomGenerationJobSucceeded(
       'jobtts4',
-      classroomResult({ ttsCoverage: { written: 4, total: 4 } }),
+      classroomResult({ ttsCoverage: { written: 4, total: 4, failed: 0 } }),
     );
 
     const job = await readClassroomGenerationJob('jobtts4');
@@ -94,7 +94,7 @@ describe('classroom generation job TTS coverage', () => {
       classroomId: 'cls1',
       url: 'http://localhost/classroom/cls1',
       scenesCount: 2,
-      ttsCoverage: { written: 4, total: 4 },
+      ttsCoverage: { written: 4, total: 4, failed: 0 },
     });
     expect(job?.result).not.toHaveProperty('warning');
   });
@@ -126,7 +126,7 @@ describe('classroom generation job TTS coverage', () => {
     await markClassroomGenerationJobSucceeded(
       'jobtts3',
       classroomResult({
-        ttsCoverage: { written: 1, total: 3 },
+        ttsCoverage: { written: 1, total: 3, failed: 2 },
         warning: INCOMPLETE_WARNING,
       }),
     );
@@ -141,7 +141,7 @@ describe('classroom generation job TTS coverage', () => {
     expect(body.status).toBe('succeeded');
     expect(body.message).toBe(INCOMPLETE_WARNING);
     expect(body.result).toMatchObject({
-      ttsCoverage: { written: 1, total: 3 },
+      ttsCoverage: { written: 1, total: 3, failed: 2 },
       warning: INCOMPLETE_WARNING,
     });
   });

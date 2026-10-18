@@ -7,6 +7,7 @@ import { buildVirtualWhiteboardContext } from '@/lib/orchestration/summarizers/w
 import { getActionDescriptions } from '@/lib/orchestration/tool-schemas';
 import type { AgentTurnSummary, WhiteboardActionRecord } from '@/lib/orchestration/types';
 import type { StatelessChatRequest } from '@/lib/types/chat';
+import { teachingGuardFromChatBody } from './teaching-guard';
 
 function compactOutlineText(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, ' ').trim();
@@ -173,6 +174,9 @@ export function buildChildPrompt(
     '# Classroom Role',
     buildRoleGuideline(agent.role),
     '',
+    buildTeachingContract(agent.role),
+    teachingGuardFromChatBody(body),
+    '',
     buildPeerContextSection(agentResponses, agent.name),
     buildLanguageConstraint(body.storeState.stage?.languageDirective),
     '',
@@ -242,6 +246,9 @@ export function buildNativeChildPrompt(
     '# Classroom Role',
     buildRoleGuideline(agent.role),
     '',
+    buildTeachingContract(agent.role),
+    teachingGuardFromChatBody(body),
+    '',
     buildPeerContextSection(agentResponses, agent.name),
     buildLanguageConstraint(body.storeState.stage?.languageDirective),
     '',
@@ -270,13 +277,34 @@ export function buildNativeChildPrompt(
     .join('\n');
 }
 
+function buildTeachingContract(role: string): string {
+  const isTeacher = role === 'teacher' || role === 'assistant';
+  const lines = [
+    '# Teaching contract (CRITICAL)',
+    '- If the user asked a concrete question, ANSWER THAT QUESTION FIRST in 1-3 sentences. Do not start by replaying the whole slide or lesson.',
+    '- Only expand into a mini-lecture after the direct answer, and only if it helps this user right now.',
+    '- If the user is clearly practicing / solving a problem (homework, quiz, "帮我做", "答案是多少" on an exercise), use a HELP LADDER: (1) one hint; (2) if still stuck, a worked intermediate step; (3) full solution only after they try or explicitly ask for the answer twice.',
+    '- Prefer "hold-answer" for exercises: guide, do not dump the final answer on the first ask.',
+    '- If you do not know, say you are not sure and suggest how to check. Never invent facts, formulas, or slide content.',
+    '- Never announce internal tools, JSON, or that you "read the PPT". Just teach.',
+  ];
+  if (isTeacher) {
+    lines.push(
+      '- For conceptual questions ("什么是/为什么/区别"), answer definitionally in one breath, then one example, then one check question at most.',
+    );
+  }
+  return lines.join('\n');
+}
+
 function buildRoleGuideline(role: string): string {
   if (role === 'teacher') {
     return [
       'Your role in this classroom: LEAD TEACHER.',
       '- Control lesson flow, slides, and pacing.',
+      '- When the user asks a question, answer it directly first — do not restart the slide narration.',
       '- Explain concepts clearly, but avoid exhaustive lectures.',
-      '- Ask questions to check understanding.',
+      '- For exercises, prefer hints and scaffolding over handing over the final answer immediately.',
+      '- Ask at most one check question after an explanation.',
       '- Use visual actions to direct attention without announcing them.',
     ].join('\n');
   }

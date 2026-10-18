@@ -168,6 +168,10 @@ export interface SceneOutline {
     difficulty: 'easy' | 'medium' | 'hard';
     questionTypes: ('single' | 'multiple' | 'text')[];
   };
+  /** Teacher-facing difficulty hint, used by the outlines editor for classroom management. */
+  teacherDifficulty?: 'easy' | 'medium' | 'hard';
+  /** Curriculum-standard tags (e.g. "人教版·分数意义"). */
+  curriculumTags?: string[];
   /**
    * @deprecated Use widgetType + widgetOutline instead
    * Legacy interactive config - kept for backward compatibility only

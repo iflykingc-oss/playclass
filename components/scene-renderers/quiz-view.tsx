@@ -23,6 +23,11 @@ const log = createLogger('QuizView');
 import type { QuizQuestion } from '@/lib/types/stage';
 import { SpeechButton } from '@/components/audio/speech-button';
 import { gradeChoiceQuestions, isShortAnswer, type QuestionResult } from '@/lib/quiz/grading';
+import {
+  buildReteachPrompt,
+  diagnoseQuizResults,
+  dispatchReteachRequest,
+} from '@/lib/quiz/formative';
 import { renderQuizMathText } from '@/lib/quiz/math-text';
 import { writeDraftRecovery } from '@/lib/quiz/persistence';
 import {
@@ -603,6 +608,94 @@ function QuestionCard({
   );
 }
 
+
+/**
+ * WP2.3: after grading, surface a formative loop entry — reteach wrong items
+ * with the help ladder, then an unaided check.
+ */
+function FormativePanel({
+  questions,
+  results,
+  locale,
+}: {
+  questions: QuizQuestion[];
+  results: QuestionResult[];
+  locale: string;
+}) {
+  const { t } = useI18n();
+  const diag = diagnoseQuizResults(questions, results);
+  const [sent, setSent] = useState(false);
+  if (diag.totalCount === 0) return null;
+
+  const zh = locale.toLowerCase().startsWith('zh');
+
+  return (
+    <div
+      data-testid="quiz-formative-panel"
+      className="mb-4 rounded-xl border border-violet-200 bg-violet-50/80 p-4 dark:border-violet-900 dark:bg-violet-950/40"
+    >
+      <div className="text-sm font-semibold text-violet-900 dark:text-violet-100">
+        {diag.needsReteach
+          ? zh
+            ? `形成性辅导 · 错 ${diag.incorrectCount} 题`
+            : `Formative coaching · ${diag.incorrectCount} wrong`
+          : zh
+            ? '全部答对 · 可做无辅助小测'
+            : 'All correct · try an unaided check'}
+      </div>
+      <p className="mt-1 text-xs leading-5 text-violet-800/90 dark:text-violet-200/90">
+        {zh
+          ? '老师会按「提示 → 中间步骤 → 最后再给解」辅导，不会直接甩答案；之后用一道无辅助小测检验是否真正掌握。'
+          : 'The teacher will use a help ladder (hint → intermediate → full solution last), then one unaided check.'}
+      </p>
+      {diag.wrongSummaries.length > 0 && (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-violet-900/80 dark:text-violet-100/80">
+          {diag.wrongSummaries.slice(0, 5).map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        className="mt-3 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+        disabled={sent}
+        onClick={() => {
+          const prompt = buildReteachPrompt(diag, locale);
+          void fetch('/api/quality/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              category: 'generation',
+              event: diag.needsReteach ? 'quiz_reteach_requested' : 'quiz_unaided_check_requested',
+              outcome: 'success',
+              reason: diag.needsReteach ? 'wrong_items' : 'all_correct',
+              meta: {
+                correct: diag.correctCount,
+                total: diag.totalCount,
+                wrongQuestionIds: diag.wrongQuestionIds.slice(0, 10),
+              },
+            }),
+          });
+          dispatchReteachRequest(prompt, { wrongQuestionIds: diag.wrongQuestionIds });
+          setSent(true);
+        }}
+      >
+        {sent
+          ? zh
+            ? '已发送给老师'
+            : 'Sent to teacher'
+          : diag.needsReteach
+            ? zh
+              ? '请老师针对错题辅导'
+              : 'Ask teacher to reteach'
+            : zh
+              ? '来一道无辅助小测'
+              : 'Start unaided check'}
+      </button>
+    </div>
+  );
+}
+
 function ScoreBanner({
   score,
   total,
@@ -1069,6 +1162,7 @@ export function QuizView({ questions, sceneId, stageId }: QuizViewProps) {
             {/* Results */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               <ScoreBanner score={earnedScore} total={totalPoints} results={results} />
+              <FormativePanel questions={questions} results={results} locale={locale} />
 
               {questions.map((q, i) => {
                 const r = resultMap[q.id];

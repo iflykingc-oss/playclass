@@ -365,9 +365,16 @@ function skippedTtsCoverage(
   reason: string,
   providerId?: TTSProviderId,
 ): ClassroomTtsCoverage {
+  const totalSkipped = countNarratableSpeechActions(scenes, providerId);
   const coverage: ClassroomTtsCoverage = {
     written: 0,
-    total: countNarratableSpeechActions(scenes, providerId),
+    total: totalSkipped,
+    failed: totalSkipped,
+    providerId,
+    voice: providerId ? DEFAULT_TTS_VOICES[providerId as keyof typeof DEFAULT_TTS_VOICES] : undefined,
+    failures: totalSkipped
+      ? [{ actionId: '*', reason: reason.slice(0, 200) }]
+      : [],
   };
   log.warn(reason);
   if (coverage.written < coverage.total)
@@ -375,9 +382,21 @@ function skippedTtsCoverage(
   return coverage;
 }
 
+export interface ClassroomTtsClipFailure {
+  actionId: string;
+  reason: string;
+}
+
 export interface ClassroomTtsCoverage {
   written: number;
   total: number;
+  /** Clips left silent after TTS failure / rate-limit budget exhaustion. */
+  failed: number;
+  /** The single provider+voice pair used for the whole classroom (voice lock). */
+  providerId?: string;
+  voice?: string;
+  /** Per-clip degradation reasons (WP1.2 / admin audit). */
+  failures?: ClassroomTtsClipFailure[];
 }
 
 /** Loud one-line summary for a classroom TTS run. */
@@ -451,6 +470,7 @@ export async function generateTTSForClassroom(
   let budgetExhausted = false;
   let written = 0;
   const total = countNarratableSpeechActions(scenes, providerId);
+  const failures: Array<{ actionId: string; reason: string }> = [];
 
   const waitForTtsSlot = async () => {
     signal?.throwIfAborted();
@@ -481,6 +501,10 @@ export async function generateTTSForClassroom(
       const audioId = `tts_s${sceneOrder}_${action.id}`;
       if (budgetExhausted) {
         log.warn(`TTS back-off budget exhausted; leaving ${audioId} silent`);
+        failures.push({
+          actionId: String(action.id ?? audioId),
+          reason: 'rate_limit_backoff_budget_exhausted',
+        });
         await emitTtsProgress();
         continue;
       }
@@ -528,6 +552,10 @@ export async function generateTTSForClassroom(
               log.warn(
                 `TTS Retry-After ${retryAfterMs}ms exceeds remaining back-off budget for ${audioId}; leaving this clip silent and widening spacing to ${spacingMs}ms`,
               );
+              failures.push({
+                actionId: String(action.id ?? audioId),
+                reason: `retry_after_exceeds_budget:${retryAfterMs}ms`,
+              });
               break;
             }
             if (backoffSpentMs + delayMs > backoffBudgetMs) {
@@ -548,8 +576,19 @@ export async function generateTTSForClassroom(
           }
           if (err instanceof TTSRateLimitError) {
             log.warn(`TTS rate limit retries exhausted for ${audioId}; leaving speech silent`);
+            failures.push({
+              actionId: String(action.id ?? audioId),
+              reason: 'rate_limit_retries_exhausted',
+            });
           } else {
             log.warn(`TTS generation failed for action ${action.id}:`, err);
+            failures.push({
+              actionId: String(action.id ?? audioId),
+              reason:
+                err instanceof Error
+                  ? `${err.name}:${err.message}`.slice(0, 200)
+                  : String(err).slice(0, 200),
+            });
           }
           break;
         }
@@ -561,5 +600,12 @@ export async function generateTTSForClassroom(
   const summary = classroomTtsSummary(written, total);
   if (written < total) log.error(summary);
   else log.info(summary);
-  return { written, total };
+  return {
+    written,
+    total,
+    failed: Math.max(0, total - written),
+    providerId,
+    voice,
+    failures,
+  };
 }

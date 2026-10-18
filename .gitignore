@@ -90,3 +90,9 @@ e2e/screenshots/
 # local e2e screenshots for #619 review
 e2e/__screenshots-619/
 /.playwright-mcp/
+
+# local test credentials (do not publish)
+/本地测试账号.md
+*.dev-server.log
+*.dev-server.err.log
+.env.local

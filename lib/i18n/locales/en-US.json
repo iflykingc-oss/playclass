@@ -11,7 +11,9 @@
   },
   "home": {
     "slogan": "Generative Learning in Multi-Agent Interactive Classroom",
-    "greetingWithName": "Hi, {{name}}"
+    "greetingWithName": "Hi, {{name}}",
+    "backToDashboard": "Back to dashboard",
+    "openCatalog": "Catalog"
   },
   "toolbar": {
     "pdfParser": "Parser",
@@ -53,8 +55,8 @@
     "exporting": "Exporting...",
     "exportSuccess": "Export successful",
     "exportFailed": "Export failed",
-    "classroomZip": "Export Classroom ZIP",
-    "classroomZipDesc": "Course structure + media files",
+    "classroomZip": "Export offline classroom",
+    "classroomZipDesc": "Includes index.html player — unzip and double-click to teach",
     "scriptMd": "Download Script (.md)",
     "scriptMdDesc": "Narration text as Markdown",
     "script": "Download Script",
@@ -160,7 +162,12 @@
     },
     "interactiveRuntimeError": {
       "title": "This interactive failed to run",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "reload": "Reload this page",
+      "copy": "Copy error",
+      "copied": "Copied",
+      "mayBeUnresponsive": "This interactive page may not respond to clicks. Details below.",
+      "runtimeErrorPrefix": "Runtime error"
     },
     "tabs": {
       "lecture": "Notes",
@@ -2148,6 +2155,85 @@
       "error": {
         "materialExtraction": null
       }
+    }
+  },
+  "platform": {
+    "dashboard": {
+      "title": "Dashboard",
+      "overview": "Overview",
+      "shares": "Published Courses",
+      "mcp": "MCP API Keys",
+      "coursesPublished": "Courses Published",
+      "quotaUsed": "Quota Used This Month",
+      "remaining": "Remaining",
+      "exportTitle": "Export Options",
+      "exportPptx": "📊 Interactive Slides",
+      "exportPptxDesc": "Open any course → Export → .pptx. Editable in PowerPoint.",
+      "exportVideo": "🎬 Video",
+      "exportVideoDesc": "Open any course → Export → MP4 with AI narration.",
+      "exportLink": "🔗 Live Course Link",
+      "exportLinkDesc": "Publish a share link — students interact with the AI teacher live.",
+      "noShares": "No published courses yet.",
+      "titleCol": "Title",
+      "accessCol": "Access",
+      "linkCol": "Share Link",
+      "loginRequired": "Login required",
+      "public": "Public",
+      "mcpDesc": "Use these keys to call the platform from ChatGPT, Claude, or any MCP-compatible AI tool.",
+      "endpoint": "Endpoint",
+      "yourNewKey": "Your new key (copy it now, it won't be shown again):",
+      "createKey": "+ Create New Key",
+      "keyCol": "Key",
+      "nameCol": "Name",
+      "lastUsed": "Last Used",
+      "never": "Never"
+    },
+    "catalog": {
+      "title": "Course Catalog",
+      "subtitle": "One-click import open-source courses and turn them into interactive AI classrooms.",
+      "generateBtn": "Generate Interactive Course"
+    },
+    "auth": {
+      "signIn": "Sign in",
+      "signUp": "Sign up",
+      "welcome": "Welcome back to your AI classroom studio.",
+      "welcomeRegister": "Create your AI classroom studio account.",
+      "email": "Email",
+      "password": "Password",
+      "name": "Name",
+      "accountType": "Account Type",
+      "personal": "Personal",
+      "org": "Organization",
+      "noAccount": "No account?",
+      "haveAccount": "Already have an account?",
+      "createOne": "Create one",
+      "signInBtn": "Sign in",
+      "signUpBtn": "Sign up"
+    },
+    "admin": {
+      "title": "Platform Admin",
+      "users": "Users",
+      "orgs": "Organizations",
+      "providers": "Model Providers",
+      "adminLogin": "Admin Login",
+      "adminLoginDesc": "Platform super-admin access",
+      "email": "Email",
+      "password": "Password",
+      "signIn": "Sign in",
+      "colEmail": "Email",
+      "colName": "Name",
+      "colType": "Type",
+      "colCreated": "Created",
+      "colOrgName": "Name",
+      "colPlan": "Plan",
+      "colSeats": "Seats",
+      "colOwner": "Owner",
+      "providerDesc": "Edit server-providers.yml. API keys are server-side only. Save applies immediately.",
+      "saveConfig": "Save Config",
+      "saved": "Saved!",
+      "hotReloaded": "Saved — config hot-reloaded",
+      "insertDeepseek": "Insert DeepSeek Template",
+      "insertDoubao": "Insert Doubao Template"
     }
   }
 }

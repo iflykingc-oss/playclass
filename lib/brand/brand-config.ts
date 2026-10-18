@@ -23,12 +23,12 @@ export interface BrandConfig {
   themeColor: string;
 }
 
-/** The default brand: the product itself, with no vendor overrides. */
+/** The default brand: playclass (commercial product over OpenMAIC engine). */
 export const DEFAULT_BRAND: BrandConfig = {
-  productName: 'OpenMAIC',
-  shortName: 'OpenMAIC',
-  logoSrc: '/logo-horizontal.png',
+  productName: 'playclass',
+  shortName: 'playclass',
+  logoSrc: '/playclass-logo.svg',
   logoHasWordmark: true,
-  markSrc: '/openmaic-mark.png',
-  themeColor: '#722ed1',
+  markSrc: '/playclass-logo.svg',
+  themeColor: '#7c3aed',
 };

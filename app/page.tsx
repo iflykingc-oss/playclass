@@ -823,11 +823,27 @@ function HomePage() {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className={cn('relative z-20 w-full max-w-[800px] flex flex-col items-center mt-[10vh]')}
       >
+        {/* Back to user workbench — create-course entry must not strand the teacher */}
+        <div className="w-full flex items-center justify-between mb-4">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← {t('home.backToDashboard') || '返回工作台'}
+          </a>
+          <a
+            href="/catalog"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {t('home.openCatalog') || '课程市场'}
+          </a>
+        </div>
+
         {/* ── Logo ── */}
         <div className="relative" data-pro-morph="lockup">
           <motion.img
-            src="/logo-horizontal.png"
-            alt="OpenMAIC"
+            src="/playclass-logo.svg"
+            alt="playclass"
             initial={heroEnter({ opacity: 0, scale: 0.9 })}
             animate={{ opacity: 1, scale: 1 }}
             transition={{

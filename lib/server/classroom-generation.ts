@@ -11,6 +11,7 @@ import {
   withGenerationRetry,
   type AICallFn,
   type AgentInfo,
+  type SceneOutline,
 } from '@openmaic/generation';
 import { createSceneWithActions } from '@/lib/server/scene-generation';
 import { generatePBLV2Project } from '@/lib/pbl/v2/agents/planner';
@@ -48,6 +49,29 @@ import type { Scene, Stage } from '@/lib/types/stage';
 import { AGENT_COLOR_PALETTE, AGENT_DEFAULT_AVATARS } from '@/lib/constants/agent-defaults';
 
 const log = createLogger('Classroom');
+
+/**
+ * WP2.5: teacher-set difficulty / curriculum tags must win over the model's
+ * guess (Easy Trap: LLMs underestimate misconception-driven items).
+ */
+function withTeacherDifficultyHint<T extends { description?: string; teacherDifficulty?: string; curriculumTags?: string[] }>(
+  outline: T,
+): T {
+  const notes: string[] = [];
+  if (outline.teacherDifficulty) {
+    notes.push(`教师标注难度：${outline.teacherDifficulty}（以教师标注为准，不要按模型直觉改简单）`);
+  }
+  if (outline.curriculumTags?.length) {
+    notes.push(`课标/教材标签：${outline.curriculumTags.join('、')}（讲解与例题需对齐）`);
+  }
+  if (notes.length === 0) return outline;
+  return {
+    ...outline,
+    description: `${outline.description || ''}\n[教师标注] ${notes.join('；')}`,
+  };
+}
+
+
 
 export function containPBLGenerationError(error: unknown, sceneTitle: string): null {
   if (!(error instanceof PBLGenerationError)) throw error;
@@ -104,6 +128,13 @@ export interface GenerateClassroomResult {
    * A requested run with no narratable speech (`total` 0) has coverage and no warning.
    */
   warning?: string;
+  /** Number of AI video clips actually written to the media dir (0 when none / skipped). */
+  videoClipsGenerated?: number;
+  /**
+   * WP1.3: scenes that failed after retries. The rest of the classroom is still
+   * delivered — one bad page must not discard the whole run (#595).
+   */
+  failedScenes?: Array<{ index: number; title: string; error: string }>;
 }
 
 function createInMemoryStore(stage: Stage): StageStore {
@@ -254,6 +285,8 @@ export async function generateClassroom(
     baseUrl: string;
     signal?: AbortSignal;
     onProgress?: (progress: ClassroomGenerationProgress) => Promise<void> | void;
+    /** WP1.3 checkpoint: called once outlines exist so a crash can resume. */
+    onOutlineCheckpoint?: (outlines: SceneOutline[]) => Promise<void> | void;
   },
 ): Promise<GenerateClassroomResult> {
   const { requirement, pdfContent } = input;
@@ -570,6 +603,14 @@ export async function generateClassroom(
     `Generated ${outlines.length} scene outlines (languageDirective: ${languageDirective}, courseTitle: ${courseTitle ?? 'n/a'})`,
   );
 
+  // WP1.3: persist outlines before the long scene loop so a mid-run crash can
+  // resume from scene generation instead of re-paying for outline LLM calls.
+  try {
+    await options.onOutlineCheckpoint?.(outlines);
+  } catch (checkpointError) {
+    log.warn('Outline checkpoint failed (continuing without resume point):', checkpointError);
+  }
+
   await options.onProgress?.({
     step: 'generating_outlines',
     progress: 30,
@@ -636,11 +677,17 @@ export async function generateClassroom(
     log.info('Stage 2: Generating scene content and actions...');
     let generatedScenes = 0;
 
+    const failedScenes: Array<{ index: number; title: string; error: string }> = [];
+
     for (const [index, outline] of outlines.entries()) {
-      const safeOutline = applyOutlineFallbacks(outline, true, {
-        allowProceduralSkill: vocationalActive,
-      });
+      const safeOutline = withTeacherDifficultyHint(
+        applyOutlineFallbacks(outline, true, {
+          allowProceduralSkill: vocationalActive,
+        }),
+      );
       const progressStart = 30 + Math.floor((index / Math.max(outlines.length, 1)) * 60);
+      let progressEnd = 0;
+      try {
 
       await options.onProgress?.({
         step: 'generating_scenes',
@@ -727,14 +774,36 @@ export async function generateClassroom(
       }
 
       generatedScenes += 1;
-      const progressEnd = 30 + Math.floor(((index + 1) / Math.max(outlines.length, 1)) * 60);
+      progressEnd = 30 + Math.floor(((index + 1) / Math.max(outlines.length, 1)) * 60);
       await options.onProgress?.({
         step: 'generating_scenes',
         progress: Math.min(progressEnd, 90),
-        message: `Generated ${generatedScenes}/${outlines.length} scenes`,
+        message: failedScenes.length
+          ? `Generated ${generatedScenes}/${outlines.length} scenes (${failedScenes.length} failed)`
+          : `Generated ${generatedScenes}/${outlines.length} scenes`,
         scenesGenerated: generatedScenes,
         totalScenes: outlines.length,
       });
+      } catch (sceneError) {
+        // WP1.3 (#595): isolate per-scene failures. A single page dying must
+        // not abort the classroom — record it and keep going.
+        const message = sceneError instanceof Error ? sceneError.message : String(sceneError);
+        failedScenes.push({
+          index,
+          title: (safeOutline as { title?: string }).title ?? `scene ${index + 1}`,
+          error: message.slice(0, 300),
+        });
+        log.error(
+          `Scene ${index + 1}/${outlines.length} failed after retries (${safeOutline.title}): ${message}`,
+        );
+        await options.onProgress?.({
+          step: 'generating_scenes',
+          progress: Math.min(progressEnd, 90),
+          message: `Scene ${index + 1}/${outlines.length} failed, continuing (${failedScenes.length} failed)`,
+          scenesGenerated: generatedScenes,
+          totalScenes: outlines.length,
+        });
+      }
     }
 
     const scenes = store.getState().scenes;
@@ -743,6 +812,8 @@ export async function generateClassroom(
     if (scenes.length === 0) {
       throw new Error('No scenes were generated');
     }
+
+    let videoClipsGenerated = 0;
 
     // Phase: Media generation (after all scenes generated)
     if (input.enableImageGeneration || input.enableVideoGeneration) {
@@ -757,7 +828,8 @@ export async function generateClassroom(
       try {
         const mediaMap = await generateMediaForClassroom(outlines, stageId, options.baseUrl);
         replaceMediaPlaceholders(scenes, mediaMap);
-        log.info(`Media generation complete: ${Object.keys(mediaMap).length} files`);
+        videoClipsGenerated = Object.keys(mediaMap).filter((k) => k.startsWith('gen_vid_')).length;
+        log.info(`Media generation complete: ${Object.keys(mediaMap).length} files (${videoClipsGenerated} video clips)`);
       } catch (err) {
         log.warn('Media generation phase failed, continuing:', err);
       }
@@ -794,7 +866,11 @@ export async function generateClassroom(
       } catch (err) {
         if (isAbortError(err)) throw err;
         log.warn('TTS generation phase failed, continuing:', err);
-        ttsCoverage = { written: 0, total: countNarratableSpeechActions(scenes) };
+        ttsCoverage = {
+          written: 0,
+          total: countNarratableSpeechActions(scenes),
+          failed: countNarratableSpeechActions(scenes),
+        };
         ttsFailureWarning = TTS_PHASE_FAILED_WARNING;
       }
     }
@@ -829,8 +905,19 @@ export async function generateClassroom(
       scenes: persisted.scenes,
       scenesCount: persisted.scenes.length,
       createdAt: persisted.createdAt,
+      videoClipsGenerated,
+      ...(failedScenes.length > 0 ? { failedScenes } : {}),
       ...(ttsCoverage ? { ttsCoverage } : {}),
       ...(ttsWarning ? { warning: ttsWarning } : {}),
+      ...(failedScenes.length > 0
+        ? {
+            warning:
+              (ttsWarning ? `${ttsWarning}; ` : '') +
+              `${failedScenes.length} scene(s) failed and were skipped`,
+          }
+        : ttsWarning
+          ? { warning: ttsWarning }
+          : {}),
     };
   } finally {
     if (!persisted) {

@@ -5,6 +5,9 @@ import { resolveRenderServiceUrl } from '@/lib/server/render-service';
 import { capBodyStream } from '@/lib/server/capped-stream';
 import { clientIdentity } from '@/lib/server/client-identity';
 import { createLogger } from '@/lib/logger';
+import { resolvePlatformOwnerId } from '@/platform/auth';
+import { getQuota, recordUsage } from '@/platform/billing';
+import { recordQualityEvent } from '@/platform/quality';
 
 const log = createLogger('ExportVideo Render API');
 
@@ -31,6 +34,20 @@ export async function POST(req: NextRequest) {
   const resolved = resolveRenderServiceUrl();
   if ('error' in resolved) {
     return apiError('PROVIDER_DISABLED', 501, 'Render service is not configured');
+  }
+
+  // Platform: MP4 export is a billed capability (server render cost).
+  const { user } = await resolvePlatformOwnerId(req as Request);
+  if (user) {
+    const quota = await getQuota(user.id);
+    if (quota.videoExports.limit !== -1 && quota.videoExports.remaining <= 0) {
+      return apiError(
+        'RATE_LIMITED',
+        402,
+        'Monthly video export limit reached',
+        JSON.stringify(quota.videoExports),
+      );
+    }
   }
 
   // Fast-path reject an oversized body by its declared length. This is only a
@@ -84,16 +101,59 @@ export async function POST(req: NextRequest) {
         (data.reason === 'queue_full' || data.reason === 'per_identity_limit')
           ? data.reason
           : undefined;
+      void recordQualityEvent({
+        userId: user?.id ?? null,
+        category: 'export',
+        event: 'video_export_rejected',
+        outcome: 'failure',
+        reason: reason || code,
+        meta: { status: upstream.status, detail: String(detail ?? '').slice(0, 200) },
+      });
       return apiError(code, status, 'Render service rejected the request', detail, reason);
+    }
+
+    // Count the export when the render service accepts the job (202). Failed
+    // renders still consume server time, so this is intentional, not a leak.
+    if (user) {
+      try {
+        await recordUsage(user.id, 'video_export', 1, { jobId: data.jobId });
+        await recordQualityEvent({
+          userId: user.id,
+          jobId: typeof data.jobId === 'string' ? data.jobId : undefined,
+          category: 'export',
+          event: 'video_export_submitted',
+          outcome: 'success',
+          reason: 'render service accepted job',
+          meta: { jobId: data.jobId },
+        });
+      } catch (e) {
+        log.warn('Failed to record video_export usage:', e);
+      }
     }
 
     return apiSuccess({ jobId: data.jobId, pollIntervalMs: 3000 }, 202);
   } catch (error) {
     // A cap trip aborts the forwarded stream, surfacing here as a fetch error.
     if (capped.exceeded()) {
+      void recordQualityEvent({
+        userId: user?.id ?? null,
+        category: 'export',
+        event: 'video_export_failed',
+        outcome: 'failure',
+        reason: 'archive_too_large',
+        meta: {},
+      });
       return apiError('INVALID_REQUEST', 413, 'Export archive is too large');
     }
     log.error('Failed to submit render job:', error);
+    void recordQualityEvent({
+      userId: user?.id ?? null,
+      category: 'export',
+      event: 'video_export_failed',
+      outcome: 'failure',
+      reason: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
+      meta: {},
+    });
     return apiError(
       'UPSTREAM_ERROR',
       502,

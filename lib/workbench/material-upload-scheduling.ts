@@ -102,7 +102,17 @@ export async function retryMaterialUpload<T>(
         error && typeof error === 'object' && 'status' in error
           ? Number((error as { status: unknown }).status)
           : 0;
-      if ((status !== 429 && status !== 503) || attempt >= 2) throw error;
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : '';
+      // 429 covers both rate-limit and quota exhaustion. Quota must not be
+      // retried (it cannot succeed), and a hard limit should surface once —
+      // #1646: retrying MaterialQuotaExceededError only burns attempts.
+      const quotaExhausted =
+        status === 429 || /quota|exceeded|429/i.test(message);
+      // Only transient upstream unavailability is safe to retry.
+      if (quotaExhausted || status !== 503 || attempt >= 2) throw error;
       await sleep(250 * 2 ** attempt);
     }
   }

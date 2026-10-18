@@ -358,6 +358,16 @@ function PooledIframe({
         const kind = typeof d.errorKind === 'string' ? d.errorKind : 'error';
         const msg = typeof d.message === 'string' ? d.message : String(d.message ?? '');
         useSceneRuntimeErrors.getState().addError(sceneId, `[${kind}] ${msg}`);
+        // M0 quality telemetry (fire-and-forget).
+        void fetch('/api/quality/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            kind: 'interactive_error',
+            sceneId,
+            message: `[${kind}] ${msg}`.slice(0, 300),
+          }),
+        }).catch(() => {});
         return;
       }
       if (
@@ -454,6 +464,15 @@ function PooledIframe({
         <InteractiveRuntimeErrorBanner
           message={latestRuntimeError}
           onDismiss={() => setDismissedRuntimeSignature(runtimeErrorSignature)}
+          onReload={() => {
+            const frame = iframeRef.current;
+            if (!frame) return;
+            useSceneRuntimeErrors.getState().clearScene(sceneId);
+            setDismissedRuntimeSignature(null);
+            // Force a fresh document load in-place (WP1.1 anti-DOA).
+            if (entry.srcDoc != null) frame.srcdoc = entry.srcDoc;
+            else if (entry.src) frame.src = entry.src;
+          }}
         />
       ) : null}
       {playbackArmed && (

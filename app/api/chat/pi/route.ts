@@ -22,6 +22,8 @@ import {
   resolveAgentConfigs,
 } from '@/lib/chat/pi/config';
 import { runPiDirectorLoop } from '@/lib/chat/pi/director-loop';
+import { analyzeTeachingGuard } from '@/lib/chat/pi/teaching-guard';
+import { recordQualityEvent } from '@/platform/quality';
 import type { SendEvent } from '@/lib/chat/pi/types';
 import { resolveModel } from '@/lib/server/resolve-model';
 import { parseUserStageRoutes } from '@/lib/server/model-routes';
@@ -228,7 +230,26 @@ export async function POST(req: NextRequest) {
       return apiError('INVALID_REQUEST', 400, message);
     }
 
-    log.info(
+        // WP2.2: durable record when multi-turn teaching guard engages.
+    try {
+      const guard = analyzeTeachingGuard(body.messages as never);
+      if (guard.reasonCodes.length > 0) {
+        void recordQualityEvent({
+          category: 'generation',
+          event: 'teaching_guard_triggered',
+          outcome: 'degraded',
+          reason: guard.reasonCodes.join(','),
+          meta: {
+            reasonCodes: guard.reasonCodes,
+            messageCount: body.messages?.length ?? 0,
+          },
+        });
+      }
+    } catch {
+      /* telemetry only */
+    }
+
+log.info(
       `Pi request agents=${body.config.agentIds.join(', ')} messages=${body.messages.length} maxAgentTurns=${maxAgentTurns}`,
     );
 

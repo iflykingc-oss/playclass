@@ -11,7 +11,9 @@
   },
   "home": {
     "slogan": "Generative Learning in Multi-Agent Interactive Classroom",
-    "greetingWithName": "嗨，{{name}}"
+    "greetingWithName": "嗨，{{name}}",
+    "backToDashboard": "返回工作台",
+    "openCatalog": "课程市场"
   },
   "toolbar": {
     "pdfParser": "解析器",
@@ -53,8 +55,8 @@
     "exporting": "正在导出...",
     "exportSuccess": "导出成功",
     "exportFailed": "导出失败",
-    "classroomZip": "导出课堂 ZIP",
-    "classroomZipDesc": "课程结构 + 媒体文件",
+    "classroomZip": "导出离线课堂",
+    "classroomZipDesc": "含 index.html 离线播放器，解压后双击即可上课",
     "scriptMd": "下载演讲稿 (.md)",
     "scriptMdDesc": "以 Markdown 导出语音播报文字",
     "script": "下载演讲稿",
@@ -160,7 +162,12 @@
     },
     "interactiveRuntimeError": {
       "title": "这个互动未能运行",
-      "dismiss": "关闭"
+      "dismiss": "关闭",
+      "reload": "重新加载本页",
+      "copy": "复制错误",
+      "copied": "已复制",
+      "mayBeUnresponsive": "此互动页可能无法点击或运行，下面是错误详情。",
+      "runtimeErrorPrefix": "运行错误"
     },
     "tabs": {
       "lecture": "笔记",
@@ -2148,6 +2155,85 @@
       "error": {
         "materialExtraction": null
       }
+    }
+  },
+  "platform": {
+    "dashboard": {
+      "title": "创作者看板",
+      "overview": "概览",
+      "shares": "已发布课程",
+      "mcp": "MCP API 密钥",
+      "coursesPublished": "已发布课程",
+      "quotaUsed": "本月已用额度",
+      "remaining": "剩余次数",
+      "exportTitle": "导出方式",
+      "exportPptx": "📊 互动课件",
+      "exportPptxDesc": "打开课程 → 导出 → .pptx，可在 PowerPoint 中编辑。",
+      "exportVideo": "🎬 视频",
+      "exportVideoDesc": "打开课程 → 导出 → MP4（含 AI 配音）。",
+      "exportLink": "🔗 直播课程链接",
+      "exportLinkDesc": "发布分享链接 — 学员可与 AI 老师实时互动。",
+      "noShares": "还没有发布课程。",
+      "titleCol": "标题",
+      "accessCol": "访问权限",
+      "linkCol": "分享链接",
+      "loginRequired": "需登录",
+      "public": "公开",
+      "mcpDesc": "使用这些密钥从 ChatGPT、Claude 或任何 MCP 兼容 AI 工具调用本平台。",
+      "endpoint": "接口地址",
+      "yourNewKey": "您的新密钥（请立即复制，关闭后不再显示）：",
+      "createKey": "+ 新建密钥",
+      "keyCol": "密钥",
+      "nameCol": "名称",
+      "lastUsed": "最近使用",
+      "never": "从未使用"
+    },
+    "catalog": {
+      "title": "课程案例库",
+      "subtitle": "一键导入开源课程，生成互动 AI 课堂。",
+      "generateBtn": "生成互动课程"
+    },
+    "auth": {
+      "signIn": "登录",
+      "signUp": "注册",
+      "welcome": "欢迎回到 AI 课堂工作室。",
+      "welcomeRegister": "创建您的 AI 课堂工作室账号。",
+      "email": "邮箱",
+      "password": "密码",
+      "name": "昵称",
+      "accountType": "账户类型",
+      "personal": "个人",
+      "org": "机构",
+      "noAccount": "还没有账号？",
+      "haveAccount": "已有账号？",
+      "createOne": "注册",
+      "signInBtn": "登录",
+      "signUpBtn": "注册"
+    },
+    "admin": {
+      "title": "平台管理",
+      "users": "用户管理",
+      "orgs": "机构管理",
+      "providers": "模型配置",
+      "adminLogin": "管理员登录",
+      "adminLoginDesc": "平台超级管理员入口",
+      "email": "邮箱",
+      "password": "密码",
+      "signIn": "登录",
+      "colEmail": "邮箱",
+      "colName": "昵称",
+      "colType": "类型",
+      "colCreated": "创建时间",
+      "colOrgName": "机构名称",
+      "colPlan": "套餐",
+      "colSeats": "席位数",
+      "colOwner": "负责人",
+      "providerDesc": "编辑 server-providers.yml。API 密钥仅保存在服务端，用户不可见。保存后自动热加载。",
+      "saveConfig": "保存配置",
+      "saved": "已保存！",
+      "hotReloaded": "已保存 — 配置已热加载",
+      "insertDeepseek": "插入 DeepSeek 模板",
+      "insertDoubao": "插入豆包模板"
     }
   }
 }

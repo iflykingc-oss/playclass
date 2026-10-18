@@ -11,6 +11,7 @@ import {
   resolveTTSModel,
 } from '@/lib/server/provider-config';
 import { persistClassroomMediaBytes } from '@/lib/server/classroom-media-bytes';
+import { sanitizeForTTS } from '@/platform/lib/tts-sanitizer';
 
 export interface SceneTtsSummary {
   available: boolean;
@@ -90,7 +91,7 @@ export async function synthesizeSceneNarration(input: SceneTtsInput): Promise<Sc
           speed: speech.speed,
           signal: input.signal,
         },
-        speech.text,
+        sanitizeForTTS(speech.text),
       );
       if (input.signal?.aborted) throw new Error('aborted');
       // The persisted reference is the RELATIVE classroom-media path (the

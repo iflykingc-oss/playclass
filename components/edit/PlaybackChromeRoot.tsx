@@ -11,6 +11,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { RETEACH_EVENT } from '@/lib/quiz/formative';
 import { useStageStore } from '@/lib/store';
 import { PENDING_SCENE_ID } from '@/lib/store/stage';
 import { useCanvasStore } from '@/lib/store/canvas';
@@ -307,6 +308,18 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
     const stageRef = useRef<HTMLDivElement>(null);
     // Guard to prevent double flash when manual stop triggers onDiscussionEnd
     const manualStopRef = useRef(false);
+
+    // WP2.3: quiz formative panel asks the teacher to reteach wrong items.
+    useEffect(() => {
+      const onReteach = (event: Event) => {
+        const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+        const prompt = detail?.prompt;
+        if (!prompt) return;
+        void chatAreaRef.current?.sendMessage(prompt);
+      };
+      window.addEventListener(RETEACH_EVENT, onReteach);
+      return () => window.removeEventListener(RETEACH_EVENT, onReteach);
+    }, []);
 
     const sendMessageWithElementReference = useCallback(
       (text: string, snapshot?: ElementReferenceSendSnapshot) => {

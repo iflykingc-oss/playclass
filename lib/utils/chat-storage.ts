@@ -48,6 +48,36 @@ const MAX_CHAT_SYNC_ATTEMPTS = 8;
 const MAX_CHAT_PLAN_STEPS_PER_ATTEMPT = 8;
 const MAX_CHAT_RETRY_DELAY_MS = 500;
 
+/**
+ * Anti-storm budget (#1558): after a failed status/delete the caller's autosave
+ * tick used to mint a fresh runtime "generation" every flush. Cap how many new
+ * generations one chat session may create per minute so a sticky failure cannot
+ * produce dozens of orphan sessions and hundreds of writes.
+ */
+const MAX_GENERATIONS_PER_MINUTE = 6;
+const generationBudget = new Map<string, { count: number; windowStart: number }>();
+
+function consumeGenerationBudget(chatSessionId: string): boolean {
+  const now = Date.now();
+  const slot = generationBudget.get(chatSessionId) ?? { count: 0, windowStart: now };
+  if (now - slot.windowStart > 60_000) {
+    slot.count = 0;
+    slot.windowStart = now;
+  }
+  if (slot.count >= MAX_GENERATIONS_PER_MINUTE) return false;
+  slot.count += 1;
+  generationBudget.set(chatSessionId, slot);
+  return true;
+}
+
+function releaseGenerationBudget(chatSessionId: string): void {
+  // Called when a half-created generation is deleted — refund the slot so a
+  // clean retry after a transient blip is not starved.
+  const slot = generationBudget.get(chatSessionId);
+  if (slot && slot.count > 0) slot.count -= 1;
+}
+
+
 const defaultChatSyncSleep: ChatSyncSleep = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -712,6 +742,11 @@ async function syncOne(
       if (plan.kind === 'replace-isolated') {
         // A unique generation is safe across realms without a shared mutex:
         // every writer stores at most the normalized 200 messages plus state.
+        if (!consumeGenerationBudget(desired.id)) {
+          throw new Error(
+            `Chat generation budget exhausted for ${JSON.stringify(desired.id)}; backing off autosave`,
+          );
+        }
         const runtimeId = generationRuntimeSessionId(plan.baseRuntimeId, plan.generation, nanoid());
         try {
           await Promise.all(
@@ -746,6 +781,7 @@ async function syncOne(
           retryError = error;
           try {
             await store.deleteSession(runtimeId);
+            releaseGenerationBudget(desired.id);
             views = await runtimeViews(store, stageId, learnerKey);
           } catch {
             throw error;
@@ -765,6 +801,11 @@ async function syncOne(
       }
 
       if (plan.kind === 'start-generation') {
+        if (!consumeGenerationBudget(desired.id)) {
+          throw new Error(
+            `Chat generation budget exhausted for ${JSON.stringify(desired.id)}; backing off autosave`,
+          );
+        }
         await createOrGetRuntimeSession(store, plan.init);
         views = await runtimeViews(store, stageId, learnerKey);
         continue retryLoop;
