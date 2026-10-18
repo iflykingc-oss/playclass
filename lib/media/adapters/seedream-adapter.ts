@@ -9,7 +9,6 @@
  * - doubao-seedream-5-0-lite-260128  (explicit Lite alias)
  * - doubao-seedream-4-5-251128
  * - doubao-seedream-4-0-250828
- * - doubao-seedream-3-0-t2i-250415
  *
  * API docs: https://www.volcengine.com/docs/6791/1399028
  */
@@ -19,6 +18,7 @@ import type {
   ImageGenerationOptions,
   ImageGenerationResult,
 } from '../types';
+import { mediaFetchFor } from '../media-fetch';
 import { probeAuth } from '../probe-auth';
 import { assertNotRedirected } from '../redirect-guard';
 import { requireModel } from '../require-model';
@@ -72,7 +72,7 @@ export async function testSeedreamConnectivity(
   return probeAuth({
     providerName: 'Seedream',
     request: () =>
-      fetch(url, {
+      mediaFetchFor(config)(url, {
         method: 'POST',
         redirect: 'manual',
         headers: {
@@ -96,7 +96,7 @@ export async function generateWithSeedream(
   const baseUrl = config.baseUrl || DEFAULT_BASE_URL;
 
   const url = `${resolveArkRoot(baseUrl)}/images/generations`;
-  const response = await fetch(url, {
+  const response = await mediaFetchFor(config)(url, {
     method: 'POST',
     redirect: 'manual',
     headers: {

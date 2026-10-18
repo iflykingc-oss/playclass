@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { isAgentRuntimeConfigured, isProWorkbenchEnabled } from '@/lib/config/feature-flags';
+import {
+  anonymousOwnerForNavigation,
+  type NavigationIdentity,
+} from '@/lib/server/identity/navigation';
 
 // ---------------------------------------------------------------------------
-// Platform auth middleware — replaces OpenMAIC's ACCESS_CODE gate.
-// Lightweight: only checks cookie presence here; real session validation
-// happens in the API routes via resolvePlatformOwnerId().
+// Playclass platform middleware: fuses OpenMAIC's anonymous-owner navigation
+// cookie with the platform's login gate.
+//   - Every page request still establishes the v1.2.0 anonymous owner cookie so
+//     the owner-scoped API (materials, generation runs) resolves consistently.
+//   - Signed-in users are gated by cookie presence here; real session validation
+//     happens in the API routes (resolvePlatformOwnerId / isAdminSession).
 // ---------------------------------------------------------------------------
 
 const SESSION_COOKIE = 'platform_session';
@@ -34,6 +41,21 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 }
 
+/**
+ * Let the request through, carrying the anonymous owner a page request
+ * establishes: the cookie is set on the page response, and the forwarded
+ * request carries it too, so the page and every request it sends resolve one
+ * owner (see `lib/server/identity/navigation.ts`).
+ */
+function next(request: NextRequest, identity: NavigationIdentity | undefined): NextResponse {
+  if (!identity) return NextResponse.next();
+  const headers = new Headers(request.headers);
+  headers.set('cookie', identity.requestCookie);
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.append('set-cookie', identity.setCookie);
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -45,9 +67,17 @@ export async function middleware(request: NextRequest) {
     return new NextResponse('Not found', { status: 404 });
   }
 
+  // One anonymous owner per browser, established on the page response before
+  // any API request can mint its own (OpenMAIC v1.2.0 owner identity).
+  const identity = anonymousOwnerForNavigation({
+    method: request.method,
+    headers: request.headers,
+    pathname,
+  });
+
   // --- Platform auth gate ---
   if (isPublic(pathname)) {
-    return NextResponse.next();
+    return next(request, identity);
   }
 
   // Cookie *presence* only — real session validation happens in API routes.
@@ -59,7 +89,7 @@ export async function middleware(request: NextRequest) {
   // Classroom playback: if it's a public share (share_mode=none), allow through.
   // The classroom page/API will verify the share exists and enforce login if needed.
   if (pathname.startsWith('/classroom/')) {
-    return NextResponse.next();
+    return next(request, identity);
   }
 
   // Admin pages / APIs: admin cookie is enough (APIs re-check isAdminSession).
@@ -67,7 +97,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin');
   if (isAdminArea) {
     if (hasAdminSession || hasUserSession) {
-      return NextResponse.next();
+      return next(request, identity);
     }
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
@@ -97,7 +127,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  // Page requests → let through
+  return next(request, identity);
 }
 
 export const config = {
