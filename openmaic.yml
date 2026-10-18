@@ -1,0 +1,45 @@
+# =============================================================================
+# openmaic.yml — Playclass model configuration (OpenMAIC v1.2.0 format)
+#
+# Declares the provider accounts and the per-stage model slots the server may
+# call. Secrets are read from the environment (${VAR}); the super-admin edits
+# this file (or server-providers.yml + env) from the platform admin console and
+# reloads. A reference to an undeclared provider, an unset variable or an
+# unknown slot stops the server at startup with the exact location.
+#
+# The DeepSeek provider below is the launch default (OpenAI-compatible). Point
+# the super-admin to set a real key in .env.local as DEEPSEEK_API_KEY (or swap
+# this provider for any OpenAI-compatible endpoint) before course generation.
+# =============================================================================
+
+providers:
+  deepseek:
+    preset: openai-compatible
+    baseUrl: https://api.deepseek.com/v1
+    apiKey: ${DEEPSEEK_API_KEY}
+    models: [deepseek-chat, deepseek-reasoner]
+
+slots:
+  # Default chat + every chat slot below follows it.
+  llm: deepseek:deepseek-chat
+
+  # Course generation stages.
+  course.outline: deepseek:deepseek-chat
+  course.research: deepseek:deepseek-chat
+  course.agents: deepseek:deepseek-chat
+  course.content: deepseek:deepseek-chat
+  course.actions: deepseek:deepseek-chat
+  classroom: deepseek:deepseek-chat
+  agent: deepseek:deepseek-chat
+
+  # Media capabilities are off by default; enable by declaring a provider for
+  # them (image / video / tts slots) with a real key.
+  image: null
+  video: null
+  tts: null
+  asr: null
+  webSearch: null
+  document: null
+
+# Users may bring their own providers/keys for the slots lock leaves open.
+allowUserKeys: true
